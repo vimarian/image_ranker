@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=0.90*device-width, initial-scale=1">
+  <title> Image Ranker</title>
+  <link rel="stylesheet" href="resources/jquery-ui.css">
+  <link rel="shortcut icon" type="image/x-icon" href="resources/favicon/favicon.ico">
+  <!--
+  Style addendum for objects  not defined in css:
+  - vw relates width to device width
+  - Width and height of li depends on image size
+  -->
+  <style>
+    #sortable {
+      list-style-type: none;
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+    }
+
+    #sortable li {
+      margin: 4px 4px 4px 4px;
+      /*3px 3px 3px 0 */
+      padding: 1px;
+      float: left;
+      width: 261px;
+      height: 261px;
+      font-size: 4em;
+      text-align: center;
+      position: relative;
+    }
+
+    .ui-state-default:focus {
+      box-shadow: 0px 0px 0 8px #ff2600;
+      /* 0 0 0 20px */
+      /* #ff2600  12d200*/
+    }
+
+
+    .back-to-top {
+      background: #ff0000;
+      background-image: url("resources/Arrow_top.png");
+      position: fixed;
+      bottom: 168px;
+      right: 20px;
+      padding: 1em;
+      width: 29px;
+      height: 29px
+    }
+
+
+    #to_cut {
+      background: #65b8ff;
+      background-image: url("resources/circle_cut.png");
+      position: fixed;
+      bottom: 94px;
+      right: 20px;
+      padding: 1em;
+      width: 29px;
+      height: 29px
+    }
+
+    .to-bottom {
+      background: #ff0000;
+      background-image: url("resources/Arrow_bottom.png");
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 1em;
+      width: 29px;
+      height: 29px
+    }
+
+    #bottom {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+    }
+
+    /*
+  Sticky Footer Solution
+  by Steve Hatcher
+  http://stever.ca
+  http://www.cssstickyfooter.com
+  */
+
+    * {
+      margin: 0;
+      padding: 0;
+    }
+
+    /* must declare 0 margins on everything, also for main layout components use padding, not
+  vertical margins (top and bottom) to add spacing, else those margins get added to total height
+  and your footer gets pushed down a bit more, creating vertical scroll bars in the browser */
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    #wrap {
+      min-height: 100%;
+    }
+
+    #main {
+      /*overflow:auto;*/
+      padding-bottom: 10px;
+    }
+
+    /* must be same height as the footer */
+
+    #footer {
+      position: relative;
+      margin-top: -10px;
+      /* negative value of footer height */
+      height: 10px;
+      clear: both;
+    }
+
+    /*Opera Fix*/
+    body:before {
+      /* thanks to Maleika (Kohoutec)*/
+      content: "";
+      height: 100%;
+      float: left;
+      width: 0;
+      margin-top: -32767px;
+      /* thank you Erik J - negate effect of float*/
+    }
+  </style>
+
+  <script src="resources/jquery-3.3.1.min.js"></script>
+  <script src="resources/jquery-ui.js"></script>
+  <script src="resources/jquery.cookie.js"></script>
+  <link href="resources/jquery.fancybox.css" rel="stylesheet">
+  <script src="resources/jquery.fancybox.js"></script>
+  <script type="text/javascript" src="resources/dbclick.js"></script>
+
+  <!--
+  Script to sort the list items, taken from jQuery:
+  https://jqueryui.com/sortable/#display-grid
+   -->
+
+  <script>
+    $(function() {
+      $("#sortable").sortable();
+      $("#sortable").disableSelection();
+    });
+  </script>
+
+  <!-- Script to load in previous order of images (if there is already one) -->
+
+  <script>
+    jQuery(function($) {
+      var cookieName = "galaxy_ranking"
+      var list = localStorage.getItem(cookieName)
+      //console.log(list)
+      if (list) $("#sortable").html(list)
+    });
+  </script>
+
+  <!--
+Script to reset the ranking to its initial state (i.e. completely unordered)
+The item in LocalStorage gets deleted and the page reloaded.
+Only done if user confirms an alert beforehand.
+-->
+  <script>
+    //Clears the value of MyKey
+    function reset_ranking() {
+      if (confirm('Are you sure you want to reset the order?')) {
+        localStorage.removeItem("galaxy_ranking");
+        window.location.reload(false);
+      } else {}
+    }
+  </script>
+
+  <!--
+Script to toggle fullscreen mode on and off
+-->
+
+  <script>
+    function toggleFullScreen() {
+      if ((document.fullScreenElement && document.fullScreenElement !== null) ||
+        (!document.mozFullScreen && !document.webkitIsFullScreen)) {
+        if (document.documentElement.requestFullScreen) {
+          document.documentElement.requestFullScreen();
+        } else if (document.documentElement.mozRequestFullScreen) {
+          document.documentElement.mozRequestFullScreen();
+        } else if (document.documentElement.webkitRequestFullScreen) {
+          document.documentElement.webkitRequestFullScreen(Element.ALLOW_KEYBOARD_INPUT);
+        }
+      } else {
+        if (document.cancelFullScreen) {
+          document.cancelFullScreen();
+        } else if (document.mozCancelFullScreen) {
+          document.mozCancelFullScreen();
+        } else if (document.webkitCancelFullScreen) {
+          document.webkitCancelFullScreen();
+        }
+      }
+    }
+  </script>
+
+
+</head>
+
+<body>
+
+
+  <script type="text/javascript">
+    var alerted = localStorage.getItem('alerted') || '';
+    if (alerted != 'yes') {
+      alert(
+        "Welcome to the start page of the Merger Ranking Tool version 2! \
+         \n\nPlease sort the images from most to least distorted by dragging the images into the desired position. \
+         \nIt is also possible to order the images by using the keyboard on a selected (i.e. red border) image: \
+         \n- 'T' ranks the focused image to the top, 'B' ranks it to the bottom. \
+         \n- The 'Left' and 'Right' arrow keys rank the object one rank up or down. \
+         \n- The 'Up' and 'Down' arrow keys rank the respective image 50 ranks up or down. \
+         \n- You can shift through the images (i.e. change the selected image) via 'Tab' or 'Shift+Tab'.\
+         \n\nFor easier navigation there are also three buttons on the lower right corner directing you to the top, bottom or to the position of the 'C(ut)' tile (see below). \
+         \n(Note that when you are near the top or the bottom of the page the respective buttons are not visible.) \
+         \n\nAs an additional task please move the 'C(ut)' tile to a position within your sequence, which represents the separation between merging objects (independent of strength) vs. absolutely not merging at all. \
+         \n\nYou can enlarge the images by doubleclicking on them, which opens an overlayed gallery with an enlarged version of the doubleclicked image. \
+         \n\nIMPORTANT: \
+         \n\nTo save your current order please press the Save button. (You should get a warning before closing the tab/window, asking if you really want to leave this page.) \
+         \n\nBy clicking the Export button you can export your ranking to an external text file, which you can then resend to me. \
+         \nFor your convenience I created a 'rankings' directory, but of course it is not mandatory to save your results to this directory. \
+         \n\nIf you want to reset your ranking to its initial state just press the 'Reset' button. (It opens a dialog window asking if you really want to reset.) \
+         \n\nWith the 'Fullscreen' button you can toggle fullscreen mode on and off. \
+         \n\nTo access this instruction again, just press the 'Instructions' button. \
+         \n\n***** \
+         \n\nAs a final note: Please wait a few moments until the page has been completely loaded. (It may take a few seconds for all the images and scripts to load.) \
+         \n\n***** \
+         \n\nThank you for your contribution!"
+      );
+      localStorage.setItem('alerted', 'yes');
+      //localStorage.removeItem('alerted');
+    }
+  </script>
+
+  <div id="wrap">
+    <div id="main">
+
+
+
+      <!--
+Logo linking to own homepage
+-->
+
+      <a style="text-decoration: none;" target="_blank" href="https://github.com/vimarian/image_ranker">
+        <img src="resources/logo.png">
+      </a>
+
+      <!--
+Buttons containing the instructions, reseting the order, giving the opportunity
+to save the current order into a (text) file (by executing the save ranking script)
+and toggling fullscreen mode
+-->
+
+
+      <button id="instruction_button" style="vertical-align: top;" type="button" onclick="alert(
+      'Please sort the images from most to least distorted by dragging the images into the desired position.\
+      \nIt is also possible to order the images by using the keyboard on a selected (i.e. red border) image:\
+      \n&ndash; \'T\' ranks the focused image to the top, \'B\' ranks it to the bottom.\
+      \n&ndash; The \'Left\' and \'Right\' arrow keys rank the object one rank up or down.\
+      \n&ndash; The \'Up\' and \'Down\' arrow keys rank the respective image 50 ranks up or down.\
+      \n&ndash; You can shift through the images (i.e. change the selected image) via \'Tab\' or \'Shift+Tab\'.\
+      \n\nFor easier navigation there are also three buttons on the lower right corner directing you to the top, bottom or to the position of the \'C(ut)\' tile (see below).\
+      \n\nAs an additional task please move the \'C(ut)\' tile to a position within your sequence, which represents the separation between merging objects (independent of strength) vs. absolutely not merging at all.\
+      \n\nYou can enlarge the images by doubleclicking on them, which opens an overlayed gallery with an enlarged version of the doubleclicked image.\
+      \n\nIMPORTANT: To save your current order please press the Save button. (You should get a warning before closing the tab\/window, asking if you really want to leave this page.)\
+      \n\nBy clicking the Export button you can export your ranking to an external text file, which you can then resend to me.\
+      \n\nIf you want to reset your ranking to its initial state just press the \'Reset\' button. (It opens a dialog window asking if you really want to reset.)\
+      \n\nWith the \'Fullscreen\' button you can toggle fullscreen mode on and off.\
+      \n\nAs a final note: Please wait a few moments until the page has been completely loaded. (It may take a few seconds for all the images and scripts to load.)\
+      \n\nThank you for your contribution!\
+      ')"><img src="resources/instructions.png"></button>
+
+      <button title="Reset order of images to initial state" id="reset_button" style="vertical-align: top;" type="button" onclick="reset_ranking()"><img src="resources/reset.png"></button>
+
+      <button title="Save current order of images" id="save_button" style="vertical-align: top;" type="button" onclick="test()"><img src="resources/save.png"></button>
+
+      <button title="Export current order of images" id="export_button" style="vertical-align: top;" type="button" onclick="save_ranking()"><img src="resources/export.png"></button>
+
+      <button title="Enter fullscreen mode" id="fullscreen_button" style="vertical-align: top;" type="button" onclick="toggleFullScreen()"><img src="resources/fullscreen.png"></button>
+      <!-- Horizontal break to split the images from the instrumental buttons -->
+
+      <!-- Horizontal break to split the images from the instrumental buttons -->
+
+      <hr>
+
+      <!--
+Unordered list containing the actual images (thumbnails, with links to larger versions
+by using the fancybox script). The ids are the value which is then written into the
+file.
+-->
+      <ul id="sortable" class="sortable ui-sortable">
+
+        <!-- Input below the output of the python script -->
+
+<li tabindex="0" id = "cat_0" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.0" rel="gallery1" class="fancybox" href = "images/cat_0.jpeg ">
+ <img src ="images/thumbnails/cat_0_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_1" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.1" rel="gallery1" class="fancybox" href = "images/cat_1.jpeg ">
+ <img src ="images/thumbnails/cat_1_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_2" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.2" rel="gallery1" class="fancybox" href = "images/cat_2.jpeg ">
+ <img src ="images/thumbnails/cat_2_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_3" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.3" rel="gallery1" class="fancybox" href = "images/cat_3.jpeg ">
+ <img src ="images/thumbnails/cat_3_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_4" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.4" rel="gallery1" class="fancybox" href = "images/cat_4.jpeg ">
+ <img src ="images/thumbnails/cat_4_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_5" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.5" rel="gallery1" class="fancybox" href = "images/cat_5.jpeg ">
+ <img src ="images/thumbnails/cat_5_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_6" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.6" rel="gallery1" class="fancybox" href = "images/cat_6.jpeg ">
+ <img src ="images/thumbnails/cat_6_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_7" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.7" rel="gallery1" class="fancybox" href = "images/cat_7.jpeg ">
+ <img src ="images/thumbnails/cat_7_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_8" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.8" rel="gallery1" class="fancybox" href = "images/cat_8.jpeg ">
+ <img src ="images/thumbnails/cat_8_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_9" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.9" rel="gallery1" class="fancybox" href = "images/cat_9.jpeg ">
+ <img src ="images/thumbnails/cat_9_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_10" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.10" rel="gallery1" class="fancybox" href = "images/cat_10.jpeg ">
+ <img src ="images/thumbnails/cat_10_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_11" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.11" rel="gallery1" class="fancybox" href = "images/cat_11.jpeg ">
+ <img src ="images/thumbnails/cat_11_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_12" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.12" rel="gallery1" class="fancybox" href = "images/cat_12.jpeg ">
+ <img src ="images/thumbnails/cat_12_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_13" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.13" rel="gallery1" class="fancybox" href = "images/cat_13.jpeg ">
+ <img src ="images/thumbnails/cat_13_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_14" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.14" rel="gallery1" class="fancybox" href = "images/cat_14.jpeg ">
+ <img src ="images/thumbnails/cat_14_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_15" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.15" rel="gallery1" class="fancybox" href = "images/cat_15.jpeg ">
+ <img src ="images/thumbnails/cat_15_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_16" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.16" rel="gallery1" class="fancybox" href = "images/cat_16.jpeg ">
+ <img src ="images/thumbnails/cat_16_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_17" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.17" rel="gallery1" class="fancybox" href = "images/cat_17.jpeg ">
+ <img src ="images/thumbnails/cat_17_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_18" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.18" rel="gallery1" class="fancybox" href = "images/cat_18.jpeg ">
+ <img src ="images/thumbnails/cat_18_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_19" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.19" rel="gallery1" class="fancybox" href = "images/cat_19.jpeg ">
+ <img src ="images/thumbnails/cat_19_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_20" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.20" rel="gallery1" class="fancybox" href = "images/cat_20.jpeg ">
+ <img src ="images/thumbnails/cat_20_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_21" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.21" rel="gallery1" class="fancybox" href = "images/cat_21.jpeg ">
+ <img src ="images/thumbnails/cat_21_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_22" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.22" rel="gallery1" class="fancybox" href = "images/cat_22.jpeg ">
+ <img src ="images/thumbnails/cat_22_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_23" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.23" rel="gallery1" class="fancybox" href = "images/cat_23.jpeg ">
+ <img src ="images/thumbnails/cat_23_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_24" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.24" rel="gallery1" class="fancybox" href = "images/cat_24.jpeg ">
+ <img src ="images/thumbnails/cat_24_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_25" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.25" rel="gallery1" class="fancybox" href = "images/cat_25.jpeg ">
+ <img src ="images/thumbnails/cat_25_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_26" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.26" rel="gallery1" class="fancybox" href = "images/cat_26.jpeg ">
+ <img src ="images/thumbnails/cat_26_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_27" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.27" rel="gallery1" class="fancybox" href = "images/cat_27.jpeg ">
+ <img src ="images/thumbnails/cat_27_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_28" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.28" rel="gallery1" class="fancybox" href = "images/cat_28.jpeg ">
+ <img src ="images/thumbnails/cat_28_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_29" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.29" rel="gallery1" class="fancybox" href = "images/cat_29.jpeg ">
+ <img src ="images/thumbnails/cat_29_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_30" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.30" rel="gallery1" class="fancybox" href = "images/cat_30.jpeg ">
+ <img src ="images/thumbnails/cat_30_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_31" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.31" rel="gallery1" class="fancybox" href = "images/cat_31.jpeg ">
+ <img src ="images/thumbnails/cat_31_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_32" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.32" rel="gallery1" class="fancybox" href = "images/cat_32.jpeg ">
+ <img src ="images/thumbnails/cat_32_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_33" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.33" rel="gallery1" class="fancybox" href = "images/cat_33.jpeg ">
+ <img src ="images/thumbnails/cat_33_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_34" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.34" rel="gallery1" class="fancybox" href = "images/cat_34.jpeg ">
+ <img src ="images/thumbnails/cat_34_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_35" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.35" rel="gallery1" class="fancybox" href = "images/cat_35.jpeg ">
+ <img src ="images/thumbnails/cat_35_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_36" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.36" rel="gallery1" class="fancybox" href = "images/cat_36.jpeg ">
+ <img src ="images/thumbnails/cat_36_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_37" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.37" rel="gallery1" class="fancybox" href = "images/cat_37.jpeg ">
+ <img src ="images/thumbnails/cat_37_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_38" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.38" rel="gallery1" class="fancybox" href = "images/cat_38.jpeg ">
+ <img src ="images/thumbnails/cat_38_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_39" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.39" rel="gallery1" class="fancybox" href = "images/cat_39.jpeg ">
+ <img src ="images/thumbnails/cat_39_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_40" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.40" rel="gallery1" class="fancybox" href = "images/cat_40.jpeg ">
+ <img src ="images/thumbnails/cat_40_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_41" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.41" rel="gallery1" class="fancybox" href = "images/cat_41.jpeg ">
+ <img src ="images/thumbnails/cat_41_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_42" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.42" rel="gallery1" class="fancybox" href = "images/cat_42.jpeg ">
+ <img src ="images/thumbnails/cat_42_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_43" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.43" rel="gallery1" class="fancybox" href = "images/cat_43.jpeg ">
+ <img src ="images/thumbnails/cat_43_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_44" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.44" rel="gallery1" class="fancybox" href = "images/cat_44.jpeg ">
+ <img src ="images/thumbnails/cat_44_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_45" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.45" rel="gallery1" class="fancybox" href = "images/cat_45.jpeg ">
+ <img src ="images/thumbnails/cat_45_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_46" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.46" rel="gallery1" class="fancybox" href = "images/cat_46.jpeg ">
+ <img src ="images/thumbnails/cat_46_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_47" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.47" rel="gallery1" class="fancybox" href = "images/cat_47.jpeg ">
+ <img src ="images/thumbnails/cat_47_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_48" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.48" rel="gallery1" class="fancybox" href = "images/cat_48.jpeg ">
+ <img src ="images/thumbnails/cat_48_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_49" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.49" rel="gallery1" class="fancybox" href = "images/cat_49.jpeg ">
+ <img src ="images/thumbnails/cat_49_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_50" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.50" rel="gallery1" class="fancybox" href = "images/cat_50.jpeg ">
+ <img src ="images/thumbnails/cat_50_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_51" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.51" rel="gallery1" class="fancybox" href = "images/cat_51.jpeg ">
+ <img src ="images/thumbnails/cat_51_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_52" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.52" rel="gallery1" class="fancybox" href = "images/cat_52.jpeg ">
+ <img src ="images/thumbnails/cat_52_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_53" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.53" rel="gallery1" class="fancybox" href = "images/cat_53.jpeg ">
+ <img src ="images/thumbnails/cat_53_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_54" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.54" rel="gallery1" class="fancybox" href = "images/cat_54.jpeg ">
+ <img src ="images/thumbnails/cat_54_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_55" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.55" rel="gallery1" class="fancybox" href = "images/cat_55.jpeg ">
+ <img src ="images/thumbnails/cat_55_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_56" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.56" rel="gallery1" class="fancybox" href = "images/cat_56.jpeg ">
+ <img src ="images/thumbnails/cat_56_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_57" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.57" rel="gallery1" class="fancybox" href = "images/cat_57.jpeg ">
+ <img src ="images/thumbnails/cat_57_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_58" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.58" rel="gallery1" class="fancybox" href = "images/cat_58.jpeg ">
+ <img src ="images/thumbnails/cat_58_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_59" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.59" rel="gallery1" class="fancybox" href = "images/cat_59.jpeg ">
+ <img src ="images/thumbnails/cat_59_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_60" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.60" rel="gallery1" class="fancybox" href = "images/cat_60.jpeg ">
+ <img src ="images/thumbnails/cat_60_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_61" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.61" rel="gallery1" class="fancybox" href = "images/cat_61.jpeg ">
+ <img src ="images/thumbnails/cat_61_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_62" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.62" rel="gallery1" class="fancybox" href = "images/cat_62.jpeg ">
+ <img src ="images/thumbnails/cat_62_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_63" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.63" rel="gallery1" class="fancybox" href = "images/cat_63.jpeg ">
+ <img src ="images/thumbnails/cat_63_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_64" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.64" rel="gallery1" class="fancybox" href = "images/cat_64.jpeg ">
+ <img src ="images/thumbnails/cat_64_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_65" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.65" rel="gallery1" class="fancybox" href = "images/cat_65.jpeg ">
+ <img src ="images/thumbnails/cat_65_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_66" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.66" rel="gallery1" class="fancybox" href = "images/cat_66.jpeg ">
+ <img src ="images/thumbnails/cat_66_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_67" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.67" rel="gallery1" class="fancybox" href = "images/cat_67.jpeg ">
+ <img src ="images/thumbnails/cat_67_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_68" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.68" rel="gallery1" class="fancybox" href = "images/cat_68.jpeg ">
+ <img src ="images/thumbnails/cat_68_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_69" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.69" rel="gallery1" class="fancybox" href = "images/cat_69.jpeg ">
+ <img src ="images/thumbnails/cat_69_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_70" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.70" rel="gallery1" class="fancybox" href = "images/cat_70.jpeg ">
+ <img src ="images/thumbnails/cat_70_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_71" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.71" rel="gallery1" class="fancybox" href = "images/cat_71.jpeg ">
+ <img src ="images/thumbnails/cat_71_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_72" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.72" rel="gallery1" class="fancybox" href = "images/cat_72.jpeg ">
+ <img src ="images/thumbnails/cat_72_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_73" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.73" rel="gallery1" class="fancybox" href = "images/cat_73.jpeg ">
+ <img src ="images/thumbnails/cat_73_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_74" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.74" rel="gallery1" class="fancybox" href = "images/cat_74.jpeg ">
+ <img src ="images/thumbnails/cat_74_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_75" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.75" rel="gallery1" class="fancybox" href = "images/cat_75.jpeg ">
+ <img src ="images/thumbnails/cat_75_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_76" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.76" rel="gallery1" class="fancybox" href = "images/cat_76.jpeg ">
+ <img src ="images/thumbnails/cat_76_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_77" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.77" rel="gallery1" class="fancybox" href = "images/cat_77.jpeg ">
+ <img src ="images/thumbnails/cat_77_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_78" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.78" rel="gallery1" class="fancybox" href = "images/cat_78.jpeg ">
+ <img src ="images/thumbnails/cat_78_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_79" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.79" rel="gallery1" class="fancybox" href = "images/cat_79.jpeg ">
+ <img src ="images/thumbnails/cat_79_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_80" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.80" rel="gallery1" class="fancybox" href = "images/cat_80.jpeg ">
+ <img src ="images/thumbnails/cat_80_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_81" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.81" rel="gallery1" class="fancybox" href = "images/cat_81.jpeg ">
+ <img src ="images/thumbnails/cat_81_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_82" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.82" rel="gallery1" class="fancybox" href = "images/cat_82.jpeg ">
+ <img src ="images/thumbnails/cat_82_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_83" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.83" rel="gallery1" class="fancybox" href = "images/cat_83.jpeg ">
+ <img src ="images/thumbnails/cat_83_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_84" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.84" rel="gallery1" class="fancybox" href = "images/cat_84.jpeg ">
+ <img src ="images/thumbnails/cat_84_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_85" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.85" rel="gallery1" class="fancybox" href = "images/cat_85.jpeg ">
+ <img src ="images/thumbnails/cat_85_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_86" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.86" rel="gallery1" class="fancybox" href = "images/cat_86.jpeg ">
+ <img src ="images/thumbnails/cat_86_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_87" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.87" rel="gallery1" class="fancybox" href = "images/cat_87.jpeg ">
+ <img src ="images/thumbnails/cat_87_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_88" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.88" rel="gallery1" class="fancybox" href = "images/cat_88.jpeg ">
+ <img src ="images/thumbnails/cat_88_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_89" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.89" rel="gallery1" class="fancybox" href = "images/cat_89.jpeg ">
+ <img src ="images/thumbnails/cat_89_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_90" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.90" rel="gallery1" class="fancybox" href = "images/cat_90.jpeg ">
+ <img src ="images/thumbnails/cat_90_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_91" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.91" rel="gallery1" class="fancybox" href = "images/cat_91.jpeg ">
+ <img src ="images/thumbnails/cat_91_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_92" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.92" rel="gallery1" class="fancybox" href = "images/cat_92.jpeg ">
+ <img src ="images/thumbnails/cat_92_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_93" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.93" rel="gallery1" class="fancybox" href = "images/cat_93.jpeg ">
+ <img src ="images/thumbnails/cat_93_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_94" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.94" rel="gallery1" class="fancybox" href = "images/cat_94.jpeg ">
+ <img src ="images/thumbnails/cat_94_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_95" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.95" rel="gallery1" class="fancybox" href = "images/cat_95.jpeg ">
+ <img src ="images/thumbnails/cat_95_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_96" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.96" rel="gallery1" class="fancybox" href = "images/cat_96.jpeg ">
+ <img src ="images/thumbnails/cat_96_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_97" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.97" rel="gallery1" class="fancybox" href = "images/cat_97.jpeg ">
+ <img src ="images/thumbnails/cat_97_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_98" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.98" rel="gallery1" class="fancybox" href = "images/cat_98.jpeg ">
+ <img src ="images/thumbnails/cat_98_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_99" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.99" rel="gallery1" class="fancybox" href = "images/cat_99.jpeg ">
+ <img src ="images/thumbnails/cat_99_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_100" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.100" rel="gallery1" class="fancybox" href = "images/cat_100.jpeg ">
+ <img src ="images/thumbnails/cat_100_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_101" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.101" rel="gallery1" class="fancybox" href = "images/cat_101.jpeg ">
+ <img src ="images/thumbnails/cat_101_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_102" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.102" rel="gallery1" class="fancybox" href = "images/cat_102.jpeg ">
+ <img src ="images/thumbnails/cat_102_thumb.jpeg">
+ </a>
+ </li><li tabindex="0" id = "cat_103" class = "ui-state-default" onclick = "this.focus()">
+ <a tabindex="-1" title = "Cat No.103" rel="gallery1" class="fancybox" href = "images/cat_103.jpeg ">
+ <img src ="images/thumbnails/cat_103_thumb.jpeg">
+ </a>
+ </li>
+        <!--End of output of python script -->
+
+      </ul>
+
+    </div>
+
+    <div id="bottom"></div>
+
+    <!--
+Script to readout the ids in order store them in idsInOrder. Create new variable
+called orderedIdsInRows wich is a string array as well, but gets "\n" in between
+each id, so when this variable gets written into a text file, each id is written
+into a new row. Also the commas get replaced by spaces.
+Variable blob gets defined with the content being orderedIdsInRows and the
+correspodning url gets created and stored in url. The save button gets connected
+with an a element, which in turn gets as reference the url. Target blank is chosen,
+so it opens in a new window. Filename gets predefined as my_ranking.txt, but can
+be modified by user when saving the file. The append. and remove.child command is
+necessary for the Firefox (Chrome does it by itself)
+-->
+    <script>
+      function save_ranking() {
+        var idsInOrder = $("#sortable").sortable("toArray");
+        var orderedIdsInRows = ['#Ranking galaxies from most to least distorted \r\n# \r\n']
+
+        for (i = 0; i < idsInOrder.length; i++) {
+          orderedIdsInRows.push(idsInOrder[i] + "\r\n");
+        }
+        orderedIdsInRows = orderedIdsInRows.toString()
+        orderedIdsInRows = orderedIdsInRows.replace(/,/g, "");
+
+        var blob = new Blob([orderedIdsInRows], {
+          type: 'text/plain'
+        });
+        var url = window.URL.createObjectURL(blob);
+
+        var create = document.getElementById('save_button')
+
+        var link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+
+  link.download = 'final_order.txt';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link)
+      }
+    </script>
+
+    <!-- 'Button' to navigate directly to the cut-tile -->
+
+    <a href="#Cut" id="to_cut"></a>
+
+  </div>
+  </div>
+  <div id="footer">
+  </div>
+
+  <script>
+    $(document).ready(function() {
+
+      // Der Button wird mit JavaScript erzeugt und vor dem Ende des body eingebunden.
+      var back_to_top_button = ['<a href="#top" class="back-to-top"></a>'].join("");
+      $("body").append(back_to_top_button)
+
+      // Der Button wird ausgeblendet
+      $(".back-to-top").hide();
+
+      // Funktion für das Scroll-Verhalten
+      $(function() {
+        $(window).scroll(function() {
+          if ($(this).scrollTop() > 300) { // Wenn 300 Pixel gescrolled wurde
+            $('.back-to-top').fadeIn();
+          } else {
+            $('.back-to-top').fadeOut();
+          }
+        });
+
+        // $('.back-to-top').click(function () { // Klick auf den Button
+        // 	$('body,html').animate({
+        // 		scrollTop: 0
+        // 	}, 800);
+        // 	return false;
+        // });
+      });
+
+    });
+  </script>
+
+  <script>
+    $(document).ready(function() {
+
+      // Der Button wird mit JavaScript erzeugt und vor dem Ende des body eingebunden.
+      var to_bottom = ['<a href="#footer" class="to-bottom"></a>'].join("");
+      $("body").append(to_bottom)
+
+      // Determine total page height to know when to fadeout button
+
+      var body = document.body,
+        html = document.documentElement;
+
+      var height = Math.max(body.scrollHeight, body.offsetHeight,
+        html.clientHeight, html.scrollHeight, html.offsetHeight);
+
+      var height = height - 200
+
+      // Der Button wird ausgeblendet
+      //  $(".to-bottom").hide();
+
+      // Funktion für das Scroll-Verhalten
+      $(function() {
+        $(window).scroll(function() {
+          if ($(this).scrollTop() < height) { // Wenn 300 Pixel gescrolled wurde
+            $('.to-bottom').fadeIn();
+          } else {
+            $('.to-bottom').fadeOut();
+          }
+        });
+
+        // $('.back-to-top').click(function () { // Klick auf den Button
+        //   $('body,html').animate({
+        //     scrollTop: 30000
+        //   }, 800);
+        //   return false;
+        // });
+      });
+
+    });
+  </script>
+
+  <script type="text/javascript" src="resources/keyboard_support.js"></script>
+  <script type="text/javascript" src="resources/save_to_local_storage.js"></script>
+  <script>
+    window.onbeforeunload = function(e) {
+      e = e || window.event;
+
+      // For IE and Firefox prior to version 4
+      if (e) {
+        e.returnValue = 'Sure?';
+      }
+
+      // For Safari
+      return 'Sure?';
+    };
+  </script>
+
+</body>
+
+</html>
