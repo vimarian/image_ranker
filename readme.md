@@ -1,8 +1,6 @@
 ![alt text](./resources/logo.png)
 
-## Welcome to the start page of the Merger Ranking Tool version 2!
-
-Please sort the images from most to least distorted by dragging the images into the desired position.
+This tool allows you to sort images in any desired order by using drag and drop or keyboard commands.
 
 It is also possible to order the images by using the keyboard on a selected (i.e. red border) image:
 
