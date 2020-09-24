@@ -1,3 +1,5 @@
+![alt text](./resources/logo.png)
+
 ## Welcome to the start page of the Merger Ranking Tool version 2!
 
 Please sort the images from most to least distorted by dragging the images into the desired position.
